@@ -43,6 +43,54 @@ exports.register = async (req, res) => {
   }
 };
 
+// Register Admin (requires admin registration secret)
+exports.registerAdmin = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    const providedSecret = req.header('x-admin-secret');
+    const expectedSecret = process.env.ADMIN_REGISTRATION_SECRET;
+
+    if (!expectedSecret) {
+      return res.status(500).json({ message: 'Admin registration is not configured' });
+    }
+
+    if (!providedSecret || providedSecret !== expectedSecret) {
+      return res.status(403).json({ message: 'Invalid admin registration secret' });
+    }
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    const user = new User({ name, email, password, role: 'admin' });
+    await user.save();
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRE }
+    );
+
+    res.status(201).json({
+      message: 'Admin registered successfully',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Login User
 exports.login = async (req, res) => {
   try {

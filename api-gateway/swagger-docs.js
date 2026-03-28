@@ -84,6 +84,52 @@
 
 /**
  * @swagger
+ * /api/users/register-admin:
+ *   post:
+ *     summary: Register a new admin user
+ *     tags: [Users]
+ *     description: Requires x-admin-secret header that matches ADMIN_REGISTRATION_SECRET in user-service environment.
+ *     parameters:
+ *       - in: header
+ *         name: x-admin-secret
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Admin registration secret key
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Admin User
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: admin@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: admin123
+ *     responses:
+ *       201:
+ *         description: Admin registered successfully
+ *       403:
+ *         description: Invalid admin registration secret
+ *       400:
+ *         description: Validation error or email already in use
+ */
+
+/**
+ * @swagger
  * /api/users/login:
  *   post:
  *     summary: Login user
