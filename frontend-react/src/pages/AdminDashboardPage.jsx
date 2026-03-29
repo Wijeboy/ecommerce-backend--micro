@@ -13,20 +13,24 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [reviews, setReviews] = useState([]);
 
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   const [searchUsers, setSearchUsers] = useState('');
   const [userIdLookup, setUserIdLookup] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchOrders, setSearchOrders] = useState('');
   const [searchProducts, setSearchProducts] = useState('');
+  const [searchReviews, setSearchReviews] = useState('');
 
   const [userPage, setUserPage] = useState(1);
   const [orderPage, setOrderPage] = useState(1);
   const [productPage, setProductPage] = useState(1);
+  const [reviewPage, setReviewPage] = useState(1);
 
   const [createForm, setCreateForm] = useState({
     title: '',
@@ -95,10 +99,23 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function loadReviews() {
+    setLoadingReviews(true);
+    try {
+      const data = await request('/api/reviews/admin/all', { token });
+      setReviews(Array.isArray(data) ? data : []);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoadingReviews(false);
+    }
+  }
+
   useEffect(() => {
     loadUsers();
     loadOrders();
     loadProducts();
+    loadReviews();
   }, []);
 
   function onCreateChange(event) {
@@ -218,6 +235,21 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function deleteReviewByAdmin(reviewId) {
+    if (!window.confirm('Delete this review?')) return;
+
+    try {
+      await request(`/api/reviews/${reviewId}`, {
+        method: 'DELETE',
+        token,
+      });
+      toast.success('Review deleted successfully');
+      await loadReviews();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
   function paginate(data, page) {
     const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
@@ -268,9 +300,29 @@ export default function AdminDashboardPage() {
     });
   }, [products, searchProducts]);
 
+  const filteredReviews = useMemo(() => {
+    const keyword = searchReviews.trim().toLowerCase();
+    if (!keyword) return reviews;
+    return reviews.filter((r) => {
+      const id = r._id?.toLowerCase() || '';
+      const productId = r.productId?.toLowerCase() || '';
+      const userId = r.userId?.toLowerCase() || '';
+      const userName = r.userName?.toLowerCase() || '';
+      const comment = r.comment?.toLowerCase() || '';
+      return (
+        id.includes(keyword) ||
+        productId.includes(keyword) ||
+        userId.includes(keyword) ||
+        userName.includes(keyword) ||
+        comment.includes(keyword)
+      );
+    });
+  }, [reviews, searchReviews]);
+
   const usersPageData = paginate(filteredUsers, userPage);
   const ordersPageData = paginate(filteredOrders, orderPage);
   const productsPageData = paginate(filteredProducts, productPage);
+  const reviewsPageData = paginate(filteredReviews, reviewPage);
 
   const stats = useMemo(() => {
     const pendingOrders = orders.filter((o) => o.status === 'pending').length;
@@ -281,10 +333,11 @@ export default function AdminDashboardPage() {
       admins,
       products: products.length,
       orders: orders.length,
+      reviews: reviews.length,
       pendingOrders,
       completedPayments,
     };
-  }, [orders, products, users]);
+  }, [orders, products, reviews, users]);
 
   useEffect(() => {
     setUserPage(1);
@@ -297,6 +350,10 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     setProductPage(1);
   }, [searchProducts]);
+
+  useEffect(() => {
+    setReviewPage(1);
+  }, [searchReviews]);
 
   return (
     <div className="space-y-6">
@@ -312,11 +369,12 @@ export default function AdminDashboardPage() {
         </p>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
         <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Users</p><p className="text-2xl font-bold">{stats.users}</p></div>
         <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Admins</p><p className="text-2xl font-bold">{stats.admins}</p></div>
         <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Products</p><p className="text-2xl font-bold">{stats.products}</p></div>
         <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Orders</p><p className="text-2xl font-bold">{stats.orders}</p></div>
+        <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Reviews</p><p className="text-2xl font-bold">{stats.reviews}</p></div>
         <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Pending Orders</p><p className="text-2xl font-bold">{stats.pendingOrders}</p></div>
         <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Paid Orders</p><p className="text-2xl font-bold">{stats.completedPayments}</p></div>
       </section>
@@ -548,6 +606,65 @@ export default function AdminDashboardPage() {
               <button
                 onClick={() => setOrderPage((p) => Math.min(ordersPageData.totalPages, p + 1))}
                 disabled={ordersPageData.safePage === ordersPageData.totalPages}
+                className="rounded border px-2 py-1 disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border bg-white p-5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Reviews</h2>
+          <button onClick={loadReviews} className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50">Refresh</button>
+        </div>
+        <input
+          value={searchReviews}
+          onChange={(e) => setSearchReviews(e.target.value)}
+          placeholder="Search reviews by product/user/name/comment"
+          className="mb-3 w-full rounded-lg border px-3 py-2 text-sm"
+        />
+        {loadingReviews ? (
+          <p>Loading reviews...</p>
+        ) : (
+          <div className="space-y-3">
+            {reviewsPageData.rows.map((review) => (
+              <div key={review._id} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold">Review: {review._id}</p>
+                  <p className="text-sm text-slate-600">Rating: {review.rating}/5</p>
+                </div>
+                <p className="text-sm text-slate-700">Product: {review.productId}</p>
+                <p className="text-sm text-slate-700">User: {review.userName} ({review.userId})</p>
+                <p className="mt-1 rounded-md bg-slate-50 p-2 text-sm text-slate-800">{review.comment}</p>
+                <div className="mt-2">
+                  <button
+                    onClick={() => deleteReviewByAdmin(review._id)}
+                    className="rounded bg-rose-600 px-2 py-1 text-xs font-medium text-white hover:bg-rose-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {!loadingReviews && (
+          <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+            <span>Page {reviewsPageData.safePage} of {reviewsPageData.totalPages}</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setReviewPage((p) => Math.max(1, p - 1))}
+                disabled={reviewsPageData.safePage === 1}
+                className="rounded border px-2 py-1 disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <button
+                onClick={() => setReviewPage((p) => Math.min(reviewsPageData.totalPages, p + 1))}
+                disabled={reviewsPageData.safePage === reviewsPageData.totalPages}
                 className="rounded border px-2 py-1 disabled:opacity-40"
               >
                 Next

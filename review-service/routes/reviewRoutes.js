@@ -8,16 +8,20 @@ const {
   updateReview,
   deleteReview,
   getUserReviews,
+  getAllReviews,
 } = require('../controllers/reviewController');
 
 // Public routes
 router.get('/product/:productId', getReviewsByProduct);
-router.get('/:id', getReviewById);
 
 // Protected routes
 router.post('/', auth, createReview);
 router.put('/:id', auth, updateReview);
 router.delete('/:id', auth, deleteReview);
 router.get('/user/my-reviews', auth, getUserReviews);
+router.get('/admin/all', auth, getAllReviews);
+
+// Public route by id should come last to avoid shadowing specific paths
+router.get('/:id', getReviewById);
 
 module.exports = router;

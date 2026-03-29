@@ -110,12 +110,26 @@ exports.deleteReview = async (req, res) => {
     }
 
     // Check authorization
-    if (review.userId !== req.userId) {
+    if (review.userId !== req.userId && req.userRole !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to delete this review' });
     }
 
     await Review.findByIdAndDelete(req.params.id);
     res.json({ message: 'Review deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get All Reviews (Admin)
+exports.getAllReviews = async (req, res) => {
+  try {
+    if (req.userRole !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const reviews = await Review.find().sort({ createdAt: -1 });
+    res.json(reviews);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
