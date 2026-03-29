@@ -203,6 +203,21 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function deleteOrder(orderId) {
+    if (!window.confirm('Delete this order?')) return;
+
+    try {
+      await request(`/api/orders/${orderId}`, {
+        method: 'DELETE',
+        token,
+      });
+      toast.success('Order deleted successfully');
+      await loadOrders();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
   function paginate(data, page) {
     const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
@@ -508,6 +523,12 @@ export default function AdminDashboardPage() {
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
+                    <button
+                      onClick={() => deleteOrder(order._id)}
+                      className="rounded bg-rose-600 px-2 py-1 text-xs font-medium text-white hover:bg-rose-700"
+                    >
+                      Delete
+                    </button>
                 </div>
               </div>
             ))}

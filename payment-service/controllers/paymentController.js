@@ -1,14 +1,70 @@
 const Payment = require('../models/Payment');
 const axios = require('axios');
 
+function isFutureOrCurrentExpiry(expiry) {
+  const match = /^(0[1-9]|1[0-2])\/([0-9]{2})$/.exec(expiry);
+  if (!match) return false;
+
+  const expiryMonth = Number(match[1]);
+  const expiryYear = 2000 + Number(match[2]);
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  if (expiryYear < currentYear) return false;
+  if (expiryYear === currentYear && expiryMonth < currentMonth) return false;
+  return true;
+}
+
 // Initiate Payment
 exports.initiatePayment = async (req, res) => {
   try {
-    const { orderId, amount, method } = req.body;
+    const { orderId, amount, method, cardDetails } = req.body;
 
     // Validation
     if (!orderId || !amount) {
       return res.status(400).json({ message: 'Please provide orderId and amount' });
+    }
+
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ message: 'Amount must be a positive number' });
+    }
+
+    const paymentMethod = method || 'credit_card';
+    const allowedMethods = ['credit_card', 'debit_card', 'online_banking', 'cash_on_delivery'];
+
+    if (!allowedMethods.includes(paymentMethod)) {
+      return res.status(400).json({ message: 'Invalid payment method' });
+    }
+
+    const requiresCardDetails = ['credit_card', 'debit_card'].includes(paymentMethod);
+
+    if (requiresCardDetails) {
+      const cardNumber = String(cardDetails?.cardNumber || '').replace(/\s+/g, '');
+      const expiry = String(cardDetails?.expiry || '');
+      const cvv = String(cardDetails?.cvv || '');
+      const cardHolderName = String(cardDetails?.cardHolderName || '').trim();
+
+      if (!cardHolderName) {
+        return res.status(400).json({ message: 'Card holder name is required' });
+      }
+
+      if (!/^[0-9]{16}$/.test(cardNumber)) {
+        return res.status(400).json({ message: 'Card number must be 16 digits' });
+      }
+
+      if (!/^(0[1-9]|1[0-2])\/[0-9]{2}$/.test(expiry)) {
+        return res.status(400).json({ message: 'Expiry must be in MM/YY format' });
+      }
+
+      if (!isFutureOrCurrentExpiry(expiry)) {
+        return res.status(400).json({ message: 'Card is expired' });
+      }
+
+      if (!/^[0-9]{3,4}$/.test(cvv)) {
+        return res.status(400).json({ message: 'CVV must be 3 or 4 digits' });
+      }
     }
 
     // Check if payment already exists
@@ -40,7 +96,9 @@ exports.initiatePayment = async (req, res) => {
       userId: req.userId,
       amount,
       items: orderItems,
-      method: method || 'credit_card',
+      method: paymentMethod,
+      cardHolderName: requiresCardDetails ? String(cardDetails?.cardHolderName || '').trim() : '',
+      cardLast4: requiresCardDetails ? String(cardDetails?.cardNumber || '').replace(/\s+/g, '').slice(-4) : '',
       status: 'pending',
     });
 

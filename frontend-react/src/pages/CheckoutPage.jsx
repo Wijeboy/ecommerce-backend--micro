@@ -14,6 +14,24 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [paymentForm, setPaymentForm] = useState({
+    method: 'credit_card',
+    cardHolderName: '',
+    cardNumber: '',
+    expiry: '',
+    cvv: '',
+  });
+
+  function formatCardNumber(value) {
+    const digitsOnly = value.replace(/\D/g, '').slice(0, 16);
+    return digitsOnly.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+  }
+
+  function formatExpiry(value) {
+    const digitsOnly = value.replace(/\D/g, '').slice(0, 4);
+    if (digitsOnly.length <= 2) return digitsOnly;
+    return `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
+  }
 
   useEffect(() => {
     refreshCart().catch((err) => setError(err.message));
@@ -58,8 +76,63 @@ export default function CheckoutPage() {
     }
   }
 
+  function onPaymentFormChange(event) {
+    const { name, value } = event.target;
+    setPaymentForm((prev) => {
+      if (name === 'cardNumber') {
+        return { ...prev, cardNumber: formatCardNumber(value) };
+      }
+
+      if (name === 'expiry') {
+        return { ...prev, expiry: formatExpiry(value) };
+      }
+
+      if (name === 'cvv') {
+        return { ...prev, cvv: value.replace(/\D/g, '').slice(0, 4) };
+      }
+
+      if (name === 'cardHolderName') {
+        return { ...prev, cardHolderName: value.replace(/\s{2,}/g, ' ') };
+      }
+
+      return { ...prev, [name]: value };
+    });
+  }
+
+  function validatePaymentForm() {
+    const isCardMethod = ['credit_card', 'debit_card'].includes(paymentForm.method);
+    if (!isCardMethod) return true;
+
+    const number = paymentForm.cardNumber.replace(/\s+/g, '');
+    const expiryOk = /^(0[1-9]|1[0-2])\/[0-9]{2}$/.test(paymentForm.expiry);
+    const cvvOk = /^[0-9]{3,4}$/.test(paymentForm.cvv);
+
+    if (!paymentForm.cardHolderName.trim()) {
+      setError('Card holder name is required.');
+      return false;
+    }
+    if (!/^[0-9]{16}$/.test(number)) {
+      setError('Card number must be 16 digits.');
+      return false;
+    }
+    if (!expiryOk) {
+      setError('Expiry must be in MM/YY format.');
+      return false;
+    }
+    if (!cvvOk) {
+      setError('CVV must be 3 or 4 digits.');
+      return false;
+    }
+
+    return true;
+  }
+
   async function initiatePayment() {
-    if (!order?._id) return;
+    if (!order?._id) return false;
+
+    if (!validatePaymentForm()) {
+      return false;
+    }
 
     setProcessing(true);
     setError('');
@@ -72,14 +145,21 @@ export default function CheckoutPage() {
         body: {
           orderId: order._id,
           amount: Number(order.totalAmount),
-          method: 'credit_card',
+          method: paymentForm.method,
+          cardDetails: {
+            cardHolderName: paymentForm.cardHolderName,
+            cardNumber: paymentForm.cardNumber.replace(/\s+/g, ''),
+            expiry: paymentForm.expiry,
+            cvv: paymentForm.cvv,
+          },
         },
       });
 
       setPayment(data.payment);
-      setMessage('Payment initiated. Confirm to complete transaction.');
+      return true;
     } catch (err) {
       setError(err.message);
+      return false;
     } finally {
       setProcessing(false);
     }
@@ -108,27 +188,10 @@ export default function CheckoutPage() {
     }
   }
 
-  async function failPayment() {
-    if (!order?._id) return;
-
-    setProcessing(true);
-    setError('');
-    setMessage('');
-
-    try {
-      const data = await request('/api/payments/fail', {
-        method: 'POST',
-        token,
-        body: { orderId: order._id },
-      });
-
-      setPayment(data.payment);
-      setMessage('Payment marked as failed for testing flow.');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setProcessing(false);
-    }
+  async function payNow() {
+    const initiated = await initiatePayment();
+    if (!initiated) return;
+    await confirmPayment();
   }
 
   return (
@@ -186,29 +249,73 @@ export default function CheckoutPage() {
             <p className="mt-2 text-sm text-slate-600">Order ID: {order._id}</p>
             <p className="text-sm text-slate-600">Amount: LKR {order.totalAmount}</p>
 
+            <div className="mt-4 space-y-2 rounded-lg border p-3">
+              <label className="block text-sm font-medium">Payment Method</label>
+              <select
+                name="method"
+                value={paymentForm.method}
+                onChange={onPaymentFormChange}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              >
+                <option value="credit_card">Credit Card</option>
+                <option value="debit_card">Debit Card</option>
+                <option value="online_banking">Online Banking</option>
+                <option value="cash_on_delivery">Cash On Delivery</option>
+              </select>
+
+              {['credit_card', 'debit_card'].includes(paymentForm.method) && (
+                <>
+                  <input
+                    name="cardHolderName"
+                    value={paymentForm.cardHolderName}
+                    onChange={onPaymentFormChange}
+                    placeholder="Card Holder Name"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    autoComplete="cc-name"
+                  />
+                  <input
+                    name="cardNumber"
+                    value={paymentForm.cardNumber}
+                    onChange={onPaymentFormChange}
+                    placeholder="Card Number (16 digits)"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    inputMode="numeric"
+                    autoComplete="cc-number"
+                    maxLength={19}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      name="expiry"
+                      value={paymentForm.expiry}
+                      onChange={onPaymentFormChange}
+                      placeholder="MM/YY"
+                      className="w-full rounded-lg border px-3 py-2 text-sm"
+                      inputMode="numeric"
+                      autoComplete="cc-exp"
+                      maxLength={5}
+                    />
+                    <input
+                      name="cvv"
+                      value={paymentForm.cvv}
+                      onChange={onPaymentFormChange}
+                      placeholder="CVV"
+                      className="w-full rounded-lg border px-3 py-2 text-sm"
+                      inputMode="numeric"
+                      autoComplete="cc-csc"
+                      maxLength={4}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
             <div className="mt-4 space-y-2">
               <button
-                onClick={initiatePayment}
+                onClick={payNow}
                 disabled={processing}
-                className="w-full rounded-lg border px-4 py-2 text-sm font-medium hover:bg-slate-50"
+                className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                Initiate Payment
-              </button>
-
-              <button
-                onClick={confirmPayment}
-                disabled={processing}
-                className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                Confirm Payment Success
-              </button>
-
-              <button
-                onClick={failPayment}
-                disabled={processing}
-                className="w-full rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
-              >
-                Mark Payment Failed
+                Pay Now
               </button>
             </div>
           </>

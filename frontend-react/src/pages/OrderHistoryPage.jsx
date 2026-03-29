@@ -11,11 +11,26 @@ export default function OrderHistoryPage() {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editingOrderId, setEditingOrderId] = useState('');
+  const [shippingDraft, setShippingDraft] = useState('');
+
+  async function loadOrders() {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await request('/api/orders', { token });
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let ignore = false;
 
-    async function loadOrders() {
+    (async () => {
       setLoading(true);
       setError('');
       try {
@@ -26,13 +41,72 @@ export default function OrderHistoryPage() {
       } finally {
         if (!ignore) setLoading(false);
       }
-    }
+    })();
 
-    loadOrders();
     return () => {
       ignore = true;
     };
   }, [token]);
+
+  async function cancelOrder(orderId) {
+    if (!window.confirm('Cancel this order?')) return;
+
+    setError('');
+    try {
+      await request(`/api/orders/${orderId}/cancel`, {
+        method: 'PUT',
+        token,
+      });
+      await loadOrders();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function startEditOrder(order) {
+    setEditingOrderId(order._id);
+    setShippingDraft(order.shippingAddress || '');
+  }
+
+  function stopEditOrder() {
+    setEditingOrderId('');
+    setShippingDraft('');
+  }
+
+  async function saveOrderUpdate(orderId) {
+    setError('');
+    try {
+      await request(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        token,
+        body: {
+          shippingAddress: shippingDraft,
+        },
+      });
+      stopEditOrder();
+      await loadOrders();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deleteOrder(orderId) {
+    if (!window.confirm('Delete this order?')) return;
+
+    setError('');
+    try {
+      await request(`/api/orders/${orderId}`, {
+        method: 'DELETE',
+        token,
+      });
+      if (editingOrderId === orderId) {
+        stopEditOrder();
+      }
+      await loadOrders();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   async function fetchPayment(orderId) {
     try {
@@ -120,6 +194,32 @@ export default function OrderHistoryPage() {
             <p className="text-sm text-slate-700">Total: LKR {order.totalAmount}</p>
             <p className="text-sm text-slate-700">Payment: {order.paymentStatus || 'pending'}</p>
 
+            {editingOrderId === order._id && (
+              <div className="mt-3 rounded-md bg-slate-50 p-3">
+                <label className="mb-1 block text-xs font-medium text-slate-600">Update Shipping Address</label>
+                <textarea
+                  value={shippingDraft}
+                  onChange={(e) => setShippingDraft(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => saveOrderUpdate(order._id)}
+                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    Save Update
+                  </button>
+                  <button
+                    onClick={stopEditOrder}
+                    className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 space-y-2 text-sm">
               {Array.isArray(order.items) && order.items.map((item, idx) => (
                 <div key={`${order._id}-${idx}`} className="rounded-md bg-slate-50 p-2">
@@ -128,12 +228,41 @@ export default function OrderHistoryPage() {
               ))}
             </div>
 
-            <button
-              onClick={() => fetchPayment(order._id)}
-              className="mt-3 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50"
-            >
-              Check Payment Detail
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => fetchPayment(order._id)}
+                className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50"
+              >
+                Check Payment Detail
+              </button>
+
+              {order.status !== 'cancelled' && order.status !== 'shipped' && order.status !== 'delivered' && order.paymentStatus !== 'completed' && (
+                <button
+                  onClick={() => cancelOrder(order._id)}
+                  className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                >
+                  Cancel Order
+                </button>
+              )}
+
+              {order.status !== 'cancelled' && order.status !== 'shipped' && order.status !== 'delivered' && editingOrderId !== order._id && (
+                <button
+                  onClick={() => startEditOrder(order)}
+                  className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  Update Address
+                </button>
+              )}
+
+              {order.status !== 'delivered' && (
+                <button
+                  onClick={() => deleteOrder(order._id)}
+                  className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                >
+                  Delete Order
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>

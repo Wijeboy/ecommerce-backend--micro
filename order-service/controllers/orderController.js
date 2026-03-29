@@ -67,6 +67,72 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
+// Cancel User Order (Owner only)
+exports.cancelUserOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.userId !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to cancel this order' });
+    }
+
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ message: 'Order is already cancelled' });
+    }
+
+    if (order.status === 'shipped' || order.status === 'delivered') {
+      return res.status(400).json({ message: 'Shipped or delivered orders cannot be cancelled' });
+    }
+
+    if (order.paymentStatus === 'completed') {
+      return res.status(400).json({ message: 'Paid orders cannot be cancelled from user flow' });
+    }
+
+    order.status = 'cancelled';
+    await order.save();
+
+    res.json({ message: 'Order cancelled successfully', order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update User Order (Owner only)
+exports.updateUserOrder = async (req, res) => {
+  try {
+    const { shippingAddress } = req.body;
+
+    if (!shippingAddress || !String(shippingAddress).trim()) {
+      return res.status(400).json({ message: 'Shipping address is required' });
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.userId !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to update this order' });
+    }
+
+    if (order.status === 'cancelled' || order.status === 'shipped' || order.status === 'delivered') {
+      return res.status(400).json({ message: 'This order can no longer be updated' });
+    }
+
+    order.shippingAddress = String(shippingAddress).trim();
+    await order.save();
+
+    res.json({ message: 'Order updated successfully', order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Update Order Status (Admin only)
 exports.updateOrderStatus = async (req, res) => {
   try {
@@ -122,6 +188,33 @@ exports.getAllOrders = async (req, res) => {
 
     const orders = await Order.find();
     res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete Order (Admin only)
+exports.deleteOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (req.userRole !== 'admin') {
+      if (order.userId !== req.userId) {
+        return res.status(403).json({ message: 'Not authorized' });
+      }
+
+      if (order.status === 'delivered') {
+        return res.status(400).json({ message: 'Delivered orders cannot be deleted' });
+      }
+    }
+
+    await Order.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Order deleted successfully', orderId: req.params.id });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

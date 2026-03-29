@@ -28,6 +28,14 @@ const paymentSchema = new mongoose.Schema(
       enum: ['credit_card', 'debit_card', 'online_banking', 'cash_on_delivery'],
       default: 'credit_card',
     },
+    cardHolderName: {
+      type: String,
+      default: '',
+    },
+    cardLast4: {
+      type: String,
+      default: '',
+    },
     status: {
       type: String,
       enum: ['pending', 'completed', 'failed'],
