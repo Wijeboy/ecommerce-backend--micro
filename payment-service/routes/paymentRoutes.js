@@ -15,7 +15,6 @@ router.post('/confirm', auth, confirmPayment);
 router.post('/fail', auth, failPayment);
 router.get('/user', auth, getUserPayments);
 
-// Public route for service-to-service (could add API key auth)
-router.get('/:orderId', getPaymentByOrderId);
+router.get('/:orderId', auth, getPaymentByOrderId);
 
 module.exports = router;

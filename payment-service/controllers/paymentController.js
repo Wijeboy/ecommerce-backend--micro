@@ -182,6 +182,10 @@ exports.getPaymentByOrderId = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
+    if (payment.userId !== req.userId && req.userRole !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to access this payment' });
+    }
+
     res.json(payment);
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -203,6 +203,16 @@
  *         description: Profile updated
  *       401:
  *         description: Unauthorized
+ *   delete:
+ *     summary: Delete own account
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Account deleted
+ *       401:
+ *         description: Unauthorized
  */
 
 /**
@@ -216,6 +226,79 @@
  *     responses:
  *       200:
  *         description: List of users
+ *       403:
+ *         description: Not authorized as admin
+ */
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get user by ID (self or admin)
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User details
+ *       403:
+ *         description: Not authorized
+ *       404:
+ *         description: User not found
+ *   put:
+ *     summary: Update user by ID (admin only)
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [user, admin]
+ *     responses:
+ *       200:
+ *         description: User updated
+ *       403:
+ *         description: Not authorized as admin
+ *   delete:
+ *     summary: Delete user by ID (admin only)
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User deleted
  *       403:
  *         description: Not authorized as admin
  */
@@ -334,6 +417,62 @@
  *     responses:
  *       200:
  *         description: Product deleted
+ */
+
+/**
+ * @swagger
+ * /api/products/bulk/ids:
+ *   post:
+ *     summary: Get multiple products by IDs (service-to-service)
+ *     tags: [Products]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - ids
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Matching products
+ */
+
+/**
+ * @swagger
+ * /api/products/stock/reduce:
+ *   post:
+ *     summary: Reduce stock for purchased items (service-to-service)
+ *     tags: [Products]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - items
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - productId
+ *                     - quantity
+ *                   properties:
+ *                     productId:
+ *                       type: string
+ *                     quantity:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Stock reduced successfully
  */
 
 /**
@@ -509,6 +648,111 @@
  *         description: Order details
  *       404:
  *         description: Order not found
+ *   put:
+ *     summary: Update user order shipping address
+ *     tags: [Orders]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - shippingAddress
+ *             properties:
+ *               shippingAddress:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Order updated
+ *       403:
+ *         description: Not authorized
+ *   delete:
+ *     summary: Delete order (admin or owner with restrictions)
+ *     tags: [Orders]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order deleted
+ *       403:
+ *         description: Not authorized
+ */
+
+/**
+ * @swagger
+ * /api/orders/{id}/cancel:
+ *   put:
+ *     summary: Cancel order (owner only, with status restrictions)
+ *     tags: [Orders]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order cancelled
+ *       400:
+ *         description: Invalid state for cancellation
+ */
+
+/**
+ * @swagger
+ * /api/orders/admin/all:
+ *   get:
+ *     summary: Get all orders (admin only)
+ *     tags: [Orders]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all orders
+ *       403:
+ *         description: Not authorized
+ */
+
+/**
+ * @swagger
+ * /api/orders/payment-status/update:
+ *   put:
+ *     summary: Update order payment status (service-to-service)
+ *     tags: [Orders]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - orderId
+ *               - paymentStatus
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *               paymentStatus:
+ *                 type: string
+ *                 enum: [pending, completed, failed]
+ *     responses:
+ *       200:
+ *         description: Payment status updated on order
  */
 
 /**
@@ -562,21 +806,84 @@
  *             properties:
  *               orderId:
  *                 type: string
+ *                 example: 67c82f015c1bf508e778a1cf
  *               amount:
  *                 type: number
+ *                 example: 1399
  *               method:
  *                 type: string
  *                 enum: [credit_card, debit_card, online_banking, cash_on_delivery]
+ *                 default: credit_card
+ *               cardDetails:
+ *                 type: object
+ *                 description: Required for credit_card and debit_card methods
+ *                 properties:
+ *                   cardHolderName:
+ *                     type: string
+ *                     example: John Doe
+ *                   cardNumber:
+ *                     type: string
+ *                     description: 16 digit card number without spaces
+ *                     example: "4532015112830366"
+ *                   expiry:
+ *                     type: string
+ *                     description: MM/YY format
+ *                     example: "12/25"
+ *                   cvv:
+ *                     type: string
+ *                     example: "123"
+ *           example:
+ *             orderId: 67c82f015c1bf508e778a1cf
+ *             amount: 1399
+ *             method: credit_card
+ *             cardDetails:
+ *               cardHolderName: John Doe
+ *               cardNumber: "4532015112830366"
+ *               expiry: "12/25"
+ *               cvv: "123"
  *     responses:
  *       201:
- *         description: Payment initiated
+ *         description: Payment initiated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Payment initiated
+ *                 payment:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     orderId:
+ *                       type: string
+ *                     userId:
+ *                       type: string
+ *                     amount:
+ *                       type: number
+ *                     method:
+ *                       type: string
+ *                     cardLast4:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [pending, completed, failed]
+ *                     createdAt:
+ *                       type: string
+ *       400:
+ *         description: Invalid request (missing fields, invalid amount, invalid card details)
+ *       500:
+ *         description: Server error
  */
 
 /**
  * @swagger
  * /api/payments/confirm:
  *   post:
- *     summary: Confirm payment
+ *     summary: Confirm payment and complete order
+ *     description: Completes the payment, reduces product stock, and updates order status
  *     tags: [Payments]
  *     security:
  *       - BearerAuth: []
@@ -591,9 +898,95 @@
  *             properties:
  *               orderId:
  *                 type: string
+ *                 example: 67c82f015c1bf508e778a1cf
+ *           example:
+ *             orderId: 67c82f015c1bf508e778a1cf
  *     responses:
  *       200:
- *         description: Payment confirmed
+ *         description: Payment confirmed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Payment confirmed successfully
+ *                 payment:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     orderId:
+ *                       type: string
+ *                     userId:
+ *                       type: string
+ *                     amount:
+ *                       type: number
+ *                     method:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [completed, pending, failed]
+ *                     transactionId:
+ *                       type: string
+ *                     updatedAt:
+ *                       type: string
+ *       400:
+ *         description: Payment already confirmed or stock update failed
+ *       404:
+ *         description: Payment not found
+ *       500:
+ *         description: Server error
+ */
+
+/**
+ * @swagger
+ * /api/payments/fail:
+ *   post:
+ *     summary: Mark payment as failed
+ *     tags: [Payments]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - orderId
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *                 example: 67c82f015c1bf508e778a1cf
+ *           example:
+ *             orderId: 67c82f015c1bf508e778a1cf
+ *     responses:
+ *       200:
+ *         description: Payment marked as failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Payment marked as failed
+ *                 payment:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     orderId:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [failed]
+ *       404:
+ *         description: Payment not found
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -601,31 +994,122 @@
  * /api/payments/{orderId}:
  *   get:
  *     summary: Get payment by order ID
+ *     description: Returns payment details. Only accessible by payment owner or admin
  *     tags: [Payments]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: orderId
  *         required: true
  *         schema:
  *           type: string
+ *         example: 67c82f015c1bf508e778a1cf
  *     responses:
  *       200:
- *         description: Payment details
+ *         description: Payment details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                 orderId:
+ *                   type: string
+ *                 userId:
+ *                   type: string
+ *                 amount:
+ *                   type: number
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       productId:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       price:
+ *                         type: number
+ *                       quantity:
+ *                         type: integer
+ *                 method:
+ *                   type: string
+ *                   enum: [credit_card, debit_card, online_banking, cash_on_delivery]
+ *                 cardLast4:
+ *                   type: string
+ *                   description: Last 4 digits of card (if applicable)
+ *                 status:
+ *                   type: string
+ *                   enum: [pending, completed, failed]
+ *                 transactionId:
+ *                   type: string
+ *                 createdAt:
+ *                   type: string
+ *                 updatedAt:
+ *                   type: string
+ *       403:
+ *         description: Not authorized to access this payment
  *       404:
  *         description: Payment not found
+ *       500:
+ *         description: Server error
  */
 
 /**
  * @swagger
  * /api/payments/user:
  *   get:
- *     summary: Get user payments
+ *     summary: Get all payments for current user
  *     tags: [Payments]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: List of user payments
+ *         description: List of user payments retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   _id:
+ *                     type: string
+ *                   orderId:
+ *                     type: string
+ *                   userId:
+ *                     type: string
+ *                   amount:
+ *                     type: number
+ *                   items:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         productId:
+ *                           type: string
+ *                         title:
+ *                           type: string
+ *                         price:
+ *                           type: number
+ *                         quantity:
+ *                           type: integer
+ *                   method:
+ *                     type: string
+ *                     enum: [credit_card, debit_card, online_banking, cash_on_delivery]
+ *                   cardLast4:
+ *                     type: string
+ *                   status:
+ *                     type: string
+ *                     enum: [pending, completed, failed]
+ *                   transactionId:
+ *                     type: string
+ *                   createdAt:
+ *                     type: string
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -745,4 +1229,19 @@
  *     responses:
  *       200:
  *         description: List of user's reviews
+ */
+
+/**
+ * @swagger
+ * /api/reviews/admin/all:
+ *   get:
+ *     summary: Get all reviews (admin only)
+ *     tags: [Reviews]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all reviews
+ *       403:
+ *         description: Not authorized
  */

@@ -7,8 +7,11 @@ const {
   login,
   getProfile,
   updateProfile,
+  deleteProfile,
   getAllUsers,
   getUserById,
+  updateUserById,
+  deleteUserById,
 } = require('../controllers/userController');
 
 // Public routes
@@ -19,9 +22,12 @@ router.post('/login', login);
 // Protected routes
 router.get('/profile', auth, getProfile);
 router.put('/profile', auth, updateProfile);
+router.delete('/profile', auth, deleteProfile);
 
 // Admin routes
 router.get('/', adminAuth, getAllUsers);
-router.get('/:id', getUserById); // For service-to-service calls
+router.put('/:id', adminAuth, updateUserById);
+router.delete('/:id', adminAuth, deleteUserById);
+router.get('/:id', auth, getUserById);
 
 module.exports = router;

@@ -1,0 +1,19 @@
+create order
+{
+  "items": [
+    {
+      "productId": "69c82f015c1bf508e778a1cf",
+      "title": "Admin Test Product",
+      "price": 999,
+      "quantity": 1
+    },
+    {
+      "productId": "69c82f015c1bf508e778a1d0",
+      "title": "Another Product",
+      "price": 200,
+      "quantity": 2
+    }
+  ],
+  "shippingAddress": "Colombo, Sri Lanka",
+  "totalAmount": 1399
+}

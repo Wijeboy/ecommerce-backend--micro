@@ -110,7 +110,7 @@ export default function OrderHistoryPage() {
 
   async function fetchPayment(orderId) {
     try {
-      const data = await request(`/api/payments/${orderId}`);
+      const data = await request(`/api/payments/${orderId}`, { token });
       setSelectedPayment(data);
     } catch (err) {
       setSelectedPayment({ error: err.message });

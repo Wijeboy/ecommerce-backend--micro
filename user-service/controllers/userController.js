@@ -169,6 +169,21 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// Delete Own Account
+exports.deleteProfile = async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get All Users (Admin only)
 exports.getAllUsers = async (req, res) => {
   try {
@@ -179,9 +194,74 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
+// Update User by ID (Admin only)
+exports.updateUserById = async (req, res) => {
+  try {
+    const { name, email, address, phone, role } = req.body;
+
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (address !== undefined) updates.address = address;
+    if (phone !== undefined) updates.phone = phone;
+
+    if (email !== undefined) {
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingUser = await User.findOne({ email: normalizedEmail });
+      if (existingUser && String(existingUser._id) !== String(req.params.id)) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+      updates.email = normalizedEmail;
+    }
+
+    if (role !== undefined) {
+      if (!['user', 'admin'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role value' });
+      }
+      updates.role = role;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User updated successfully', user });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete User by ID (Admin only)
+exports.deleteUserById = async (req, res) => {
+  try {
+    if (String(req.userId) === String(req.params.id)) {
+      return res.status(400).json({ message: 'Admin cannot delete own account from admin panel' });
+    }
+
+    const user = await User.findByIdAndDelete(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get User by ID (for other services)
 exports.getUserById = async (req, res) => {
   try {
+    if (req.userRole !== 'admin' && String(req.userId) !== String(req.params.id)) {
+      return res.status(403).json({ message: 'Not authorized to access this user' });
+    }
+
     const user = await User.findById(req.params.id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

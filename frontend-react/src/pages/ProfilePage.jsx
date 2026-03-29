@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { request } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProfilePage() {
-  const { user, token, fetchProfile, updateProfile } = useAuth();
+  const { user, token, fetchProfile, updateProfile, logout } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', address: '', phone: '' });
   const [myReviews, setMyReviews] = useState([]);
   const [reviewForm, setReviewForm] = useState({ reviewId: '', rating: 5, comment: '' });
@@ -119,6 +121,24 @@ export default function ProfilePage() {
     }
   }
 
+  async function deleteMyAccount() {
+    if (!window.confirm('Delete your account permanently? This action cannot be undone.')) return;
+
+    setError('');
+    setMessage('');
+
+    try {
+      await request('/api/users/profile', {
+        method: 'DELETE',
+        token,
+      });
+      logout();
+      navigate('/login');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   if (loading) return <p>Loading profile...</p>;
 
   return (
@@ -172,6 +192,16 @@ export default function ProfilePage() {
           Save Profile
         </button>
       </form>
+
+      <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
+        <p className="text-sm text-rose-800">Danger zone: you can permanently delete your account.</p>
+        <button
+          onClick={deleteMyAccount}
+          className="mt-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+        >
+          Delete My Account
+        </button>
+      </div>
 
       {user?.role !== 'admin' && (
         <>

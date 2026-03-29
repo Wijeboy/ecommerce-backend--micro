@@ -124,6 +124,12 @@ app.use(
     pathRewrite: {
       '^/api/reviews': '/api/reviews',
     },
+    onError: (err, req, res) => {
+      res.status(503).json({
+        message: 'Review service is currently unavailable. Please try again shortly.',
+        details: err.message,
+      });
+    },
   })
 );
 

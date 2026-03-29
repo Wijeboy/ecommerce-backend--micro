@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { request } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -9,6 +9,7 @@ const PAGE_SIZE = 5;
 export default function AdminDashboardPage() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const initializedRef = useRef(false);
 
   const [users, setUsers] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -51,6 +52,15 @@ export default function AdminDashboardPage() {
     imageUrl: '',
   });
 
+  const [userEditForm, setUserEditForm] = useState({
+    id: '',
+    name: '',
+    email: '',
+    address: '',
+    phone: '',
+    role: 'user',
+  });
+
   async function loadUsers() {
     setLoadingUsers(true);
     try {
@@ -66,7 +76,7 @@ export default function AdminDashboardPage() {
   async function fetchUserById() {
     if (!userIdLookup.trim()) return;
     try {
-      const data = await request(`/api/users/${userIdLookup.trim()}`);
+      const data = await request(`/api/users/${userIdLookup.trim()}`, { token });
       setSelectedUser(data);
       toast.success('Loaded user by id');
     } catch (err) {
@@ -112,6 +122,8 @@ export default function AdminDashboardPage() {
   }
 
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     loadUsers();
     loadOrders();
     loadProducts();
@@ -126,6 +138,63 @@ export default function AdminDashboardPage() {
   function onEditChange(event) {
     const { name, value } = event.target;
     setEditForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function onUserEditChange(event) {
+    const { name, value } = event.target;
+    setUserEditForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function startUserEdit(userRow) {
+    setUserEditForm({
+      id: userRow._id,
+      name: userRow.name || '',
+      email: userRow.email || '',
+      address: userRow.address || '',
+      phone: userRow.phone || '',
+      role: userRow.role || 'user',
+    });
+  }
+
+  async function updateUserByAdmin(event) {
+    event.preventDefault();
+    if (!userEditForm.id) return;
+
+    try {
+      await request(`/api/users/${userEditForm.id}`, {
+        method: 'PUT',
+        token,
+        body: {
+          name: userEditForm.name,
+          email: userEditForm.email,
+          address: userEditForm.address,
+          phone: userEditForm.phone,
+          role: userEditForm.role,
+        },
+      });
+      toast.success('User updated successfully');
+      await loadUsers();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
+  async function deleteUserByAdmin(userId) {
+    if (!window.confirm('Delete this user account?')) return;
+
+    try {
+      await request(`/api/users/${userId}`, {
+        method: 'DELETE',
+        token,
+      });
+      toast.success('User deleted successfully');
+      if (userEditForm.id === userId) {
+        setUserEditForm({ id: '', name: '', email: '', address: '', phone: '', role: 'user' });
+      }
+      await loadUsers();
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   async function createProduct(event) {
@@ -427,6 +496,7 @@ export default function AdminDashboardPage() {
                   <th className="px-2 py-2">Name</th>
                   <th className="px-2 py-2">Email</th>
                   <th className="px-2 py-2">Role</th>
+                  <th className="px-2 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -435,6 +505,22 @@ export default function AdminDashboardPage() {
                     <td className="px-2 py-2">{u.name}</td>
                     <td className="px-2 py-2">{u.email}</td>
                     <td className="px-2 py-2 capitalize">{u.role}</td>
+                    <td className="px-2 py-2">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => startUserEdit(u)}
+                          className="rounded border px-2 py-1 text-xs hover:bg-slate-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteUserByAdmin(u._id)}
+                          className="rounded bg-rose-600 px-2 py-1 text-xs text-white hover:bg-rose-700"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -459,6 +545,60 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {userEditForm.id && (
+          <form onSubmit={updateUserByAdmin} className="mt-4 grid gap-2 rounded-lg border bg-slate-50 p-3 md:grid-cols-2">
+            <input
+              name="name"
+              value={userEditForm.name}
+              onChange={onUserEditChange}
+              placeholder="Name"
+              className="rounded-lg border px-3 py-2 text-sm"
+              required
+            />
+            <input
+              name="email"
+              value={userEditForm.email}
+              onChange={onUserEditChange}
+              placeholder="Email"
+              className="rounded-lg border px-3 py-2 text-sm"
+              required
+            />
+            <input
+              name="address"
+              value={userEditForm.address}
+              onChange={onUserEditChange}
+              placeholder="Address"
+              className="rounded-lg border px-3 py-2 text-sm"
+            />
+            <input
+              name="phone"
+              value={userEditForm.phone}
+              onChange={onUserEditChange}
+              placeholder="Phone"
+              className="rounded-lg border px-3 py-2 text-sm"
+            />
+            <select
+              name="role"
+              value={userEditForm.role}
+              onChange={onUserEditChange}
+              className="rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <button type="submit" className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Save User</button>
+              <button
+                type="button"
+                onClick={() => setUserEditForm({ id: '', name: '', email: '', address: '', phone: '', role: 'user' })}
+                className="rounded border px-3 py-2 text-sm hover:bg-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         )}
       </section>
 
