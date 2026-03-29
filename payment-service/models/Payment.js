@@ -15,6 +15,14 @@ const paymentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    items: [
+      {
+        productId: String,
+        title: String,
+        price: Number,
+        quantity: Number,
+      },
+    ],
     method: {
       type: String,
       enum: ['credit_card', 'debit_card', 'online_banking', 'cash_on_delivery'],

@@ -8,10 +8,12 @@ const {
   updateProduct,
   deleteProduct,
   getProductsByIds,
+  reduceStock,
 } = require('../controllers/productController');
 
 // Public routes
 router.get('/', getAllProducts);
+router.post('/stock/reduce', reduceStock); // For service-to-service stock updates
 router.get('/:id', getProductById);
 router.post('/bulk/ids', getProductsByIds); // For service-to-service
 

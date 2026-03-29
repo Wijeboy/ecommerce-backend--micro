@@ -17,10 +17,29 @@ exports.initiatePayment = async (req, res) => {
       return res.status(400).json({ message: 'Payment already initiated for this order' });
     }
 
+    // Fetch order details so payment has the exact purchased items
+    let orderItems = [];
+    try {
+      const authHeader = req.header('Authorization');
+      const orderResponse = await axios.get(`${process.env.ORDER_SERVICE_URL}/api/orders/${orderId}`, {
+        headers: {
+          Authorization: authHeader,
+        },
+      });
+      orderItems = Array.isArray(orderResponse.data?.items) ? orderResponse.data.items : [];
+    } catch (orderError) {
+      return res.status(400).json({ message: `Could not fetch order details: ${orderError.message}` });
+    }
+
+    if (orderItems.length === 0) {
+      return res.status(400).json({ message: 'Cannot initiate payment for an order with no items' });
+    }
+
     const payment = new Payment({
       orderId,
       userId: req.userId,
       amount,
+      items: orderItems,
       method: method || 'credit_card',
       status: 'pending',
     });
@@ -47,8 +66,31 @@ exports.confirmPayment = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
+    // Prevent duplicate stock reduction on repeated confirmation calls
+    if (payment.status === 'completed') {
+      return res.json({ message: 'Payment already confirmed', payment });
+    }
+
+    if (!Array.isArray(payment.items) || payment.items.length === 0) {
+      return res.status(400).json({ message: 'Payment has no order items for stock reduction' });
+    }
+
     // Mock transaction ID generation
     const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Reduce stock in Product Service once payment succeeds
+    try {
+      await axios.post(`${process.env.PRODUCT_SERVICE_URL}/api/products/stock/reduce`, {
+        items: payment.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+      });
+    } catch (productError) {
+      return res.status(400).json({
+        message: `Payment could not be confirmed because stock update failed: ${productError.response?.data?.message || productError.message}`,
+      });
+    }
 
     // Update payment status
     payment.status = 'completed';

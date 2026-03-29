@@ -112,3 +112,54 @@ exports.getProductsByIds = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Reduce product stock (for service-to-service calls after payment success)
+exports.reduceStock = async (req, res) => {
+  try {
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Please provide items with productId and quantity' });
+    }
+
+    for (const item of items) {
+      if (!item.productId || !item.quantity || item.quantity <= 0) {
+        return res.status(400).json({ message: 'Each item must include valid productId and quantity' });
+      }
+
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        return res.status(404).json({ message: `Product not found: ${item.productId}` });
+      }
+
+      if (product.stock < item.quantity) {
+        return res.status(400).json({
+          message: `Insufficient stock for ${product.title}`,
+          productId: item.productId,
+          availableStock: product.stock,
+          requestedQuantity: item.quantity,
+        });
+      }
+    }
+
+    const updates = [];
+
+    for (const item of items) {
+      const updatedProduct = await Product.findByIdAndUpdate(
+        item.productId,
+        { $inc: { stock: -item.quantity } },
+        { new: true }
+      );
+      updates.push({
+        productId: updatedProduct._id,
+        title: updatedProduct.title,
+        newStock: updatedProduct.stock,
+        reducedBy: item.quantity,
+      });
+    }
+
+    res.json({ message: 'Stock reduced successfully', updates });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
