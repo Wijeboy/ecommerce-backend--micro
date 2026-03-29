@@ -17,3 +17,16 @@ create order
   "shippingAddress": "Colombo, Sri Lanka",
   "totalAmount": 1399
 }
+
+payment
+{
+  "orderId": "67c82f015c1bf508e778a1cf",
+  "amount": 1399,
+  "method": "credit_card",
+  "cardDetails": {
+    "cardHolderName": "John Doe",
+    "cardNumber": "4532015112830366",
+    "expiry": "12/25",
+    "cvv": "123"
+  }
+}
