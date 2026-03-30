@@ -20,9 +20,9 @@ exports.createOrder = async (req, res) => {
 
     await order.save();
 
-    // Clear cart after order creation
+    // Clear cart after order creation via API Gateway
     try {
-      await axios.delete(`${process.env.CART_SERVICE_URL}/api/cart/clear`, {
+      await axios.delete(`${process.env.API_GATEWAY_URL}/api/cart/clear`, {
         headers: {
           Authorization: `Bearer ${req.header('Authorization')?.replace('Bearer ', '')}`,
         },

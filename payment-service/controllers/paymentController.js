@@ -77,7 +77,7 @@ exports.initiatePayment = async (req, res) => {
     let orderItems = [];
     try {
       const authHeader = req.header('Authorization');
-      const orderResponse = await axios.get(`${process.env.ORDER_SERVICE_URL}/api/orders/${orderId}`, {
+      const orderResponse = await axios.get(`${process.env.API_GATEWAY_URL}/api/orders/${orderId}`, {
         headers: {
           Authorization: authHeader,
         },
@@ -136,9 +136,9 @@ exports.confirmPayment = async (req, res) => {
     // Mock transaction ID generation
     const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Reduce stock in Product Service once payment succeeds
+    // Reduce stock in Product Service via API Gateway once payment succeeds
     try {
-      await axios.post(`${process.env.PRODUCT_SERVICE_URL}/api/products/stock/reduce`, {
+      await axios.post(`${process.env.API_GATEWAY_URL}/api/products/stock/reduce`, {
         items: payment.items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -157,7 +157,7 @@ exports.confirmPayment = async (req, res) => {
 
     // Notify Order Service about payment completion
     try {
-      await axios.put(`${process.env.ORDER_SERVICE_URL}/api/orders/payment-status/update`, {
+      await axios.put(`${process.env.API_GATEWAY_URL}/api/orders/payment-status/update`, {
         orderId,
         paymentStatus: 'completed',
       });
@@ -222,7 +222,7 @@ exports.failPayment = async (req, res) => {
 
     // Notify Order Service
     try {
-      await axios.put(`${process.env.ORDER_SERVICE_URL}/api/orders/payment-status/update`, {
+      await axios.put(`${process.env.API_GATEWAY_URL}/api/orders/payment-status/update`, {
         orderId,
         paymentStatus: 'failed',
       });
